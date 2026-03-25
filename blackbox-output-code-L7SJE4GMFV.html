@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tracking Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .stats-card { transition: all 0.3s ease; }
+        .stats-card:hover { transform: translateY(-5px); }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-4xl font-bold text-center text-gray-800 mb-8">📊 Real-time Tracking Dashboard</h1>
+        
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="stats-card bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
+                <div class="text-3xl font-bold text-blue-600" id="totalVisits">0</div>
+                <div class="text-gray-600 mt-1">Total Visits</div>
+            </div>
+            <div class="stats-card bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
+                <div class="text-3xl font-bold text-green-600" id="uniqueVisitors">0</div>
+                <div class="text-gray-600 mt-1">Unique Visitors</div>
+            </div>
+            <div class="stats-card bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
+                <div class="text-3xl font-bold text-purple-600" id="pageViews">0</div>
+                <div class="text-gray-600 mt-1">Page Views</div>
+            </div>
+            <div class="stats-card bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
+                <div class="text-3xl font-bold text-orange-600" id="bounceRate">0%</div>
+                <div class="text-gray-600 mt-1">Bounce Rate</div>
+            </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="bg-white rounded-2xl shadow-xl border border-gray-100 p-8 mb-8">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6">Recent Activity</h2>
+            <div id="recentActivity" class="space-y-4 max-h-96 overflow-y-auto">
+                <!-- Dynamic content -->
+            </div>
+        </div>
+
+        <!-- Tracking Pixel (invisible) -->
+        <img src="/track" style="display:none;" onload="trackVisit()">
+    </div>
+
+    <script>
+        // Track visit automatically
+        function trackVisit() {
+            fetch('/api/track', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    url: window.location.href,
+                    referrer: document.referrer,
+                    userAgent: navigator.userAgent,
+                    screen: `${screen.width}x${screen.height}`,
+                    language: navigator.language
+                })
+            });
+        }
+
+        // Real-time updates via Server-Sent Events
+        const eventSource = new EventSource('/api/events');
+        eventSource.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            updateStats(data.stats);
+            updateActivity(data.recent);
+        };
+
+        function updateStats(stats) {
+            document.getElementById('totalVisits').textContent = stats.totalVisits;
+            document.getElementById('uniqueVisitors').textContent = stats.uniqueVisitors;
+            document.getElementById('pageViews').textContent = stats.pageViews;
+            document.getElementById('bounceRate').textContent = stats.bounceRate + '%';
+        }
+
+        function updateActivity(recent) {
+            const container = document.getElementById('recentActivity');
+            container.innerHTML = recent.map(activity => `
+                <div class="flex items-center p-4 bg-gray-50 rounded-xl">
+                    <div class="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                        ${activity.ip.slice(-4)}
+                    </div>
+                    <div class="ml-4 flex-1">
+                        <div class="font-semibold text-gray-900">${activity.action}</div>
+                        <div class="text-sm text-gray-500">${new Date(activity.timestamp).toLocaleString()}</div>
+                        <div class="text-xs text-gray-400">${activity.userAgent.slice(0, 50)}...</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Track clicks
+        document.addEventListener('click', function(e) {
+            fetch('/api/track-click', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    element: e.target.tagName,
+                    text: e.target.textContent?.slice(0, 50) || '',
+                    x: e.clientX,
+                    y: e.clientY
+                })
+            });
+        });
+    </script>
+</body>
+</html>
